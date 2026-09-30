@@ -93,3 +93,13 @@ test("getModelLatencyPercentiles computes p50/p95 over successful calls only", (
   assert.equal(row.p50Ms, 1000);
   assert.equal(row.p95Ms, 1900);
 });
+
+test("getGlobalLatencyPercentiles returns nulls for an empty window and values otherwise", () => {
+  assert.deepEqual(stats.getGlobalLatencyPercentiles(new Date(Date.now() + HOUR).toISOString()), {
+    p50Ms: null,
+    p95Ms: null,
+  });
+  const g = stats.getGlobalLatencyPercentiles(iso(HOUR));
+  assert.equal(typeof g.p50Ms, "number");
+  assert.ok((g.p95Ms ?? 0) >= (g.p50Ms ?? 0));
+});

@@ -147,3 +147,29 @@ export function getModelLatencyPercentiles(sinceIso: string): ModelLatencyPercen
     )
     .all({ since: sinceIso }) as ModelLatencyPercentile[];
 }
+
+/** Global p50/p95 over successful calls in the window (Provider Cockpit KPIs). */
+export function getGlobalLatencyPercentiles(sinceIso: string): {
+  p50Ms: number | null;
+  p95Ms: number | null;
+} {
+  const db = getDbInstance();
+  const row = db
+    .prepare(
+      `WITH ok AS (
+         SELECT duration,
+                ROW_NUMBER() OVER (ORDER BY duration) AS rn,
+                COUNT(*) OVER () AS cnt
+         FROM call_logs
+         WHERE timestamp >= @since
+           AND provider IS NOT NULL AND provider != '-'
+           AND status >= 200 AND status < 400
+       )
+       SELECT
+         MAX(CASE WHEN rn = (cnt * 50 + 99) / 100 THEN duration END) AS p50Ms,
+         MAX(CASE WHEN rn = (cnt * 95 + 99) / 100 THEN duration END) AS p95Ms
+       FROM ok`
+    )
+    .get({ since: sinceIso }) as { p50Ms: number | null; p95Ms: number | null } | undefined;
+  return { p50Ms: row?.p50Ms ?? null, p95Ms: row?.p95Ms ?? null };
+}
