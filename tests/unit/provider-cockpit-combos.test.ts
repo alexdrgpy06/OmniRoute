@@ -55,7 +55,7 @@ function provider(
     breaker: { state: "CLOSED", retryAfterMs: 0, failureCount: 0 },
     connections: { total: 2, active: 2, cooldown: 0, terminal: 0, disabled: 0 },
     usableConnectionIds: [`${id}-c1`, `${id}-c2`],
-    requests: 0,
+    requests: 10,
     successRate: null,
     avgLatencyMs: null,
     lastError: null,
@@ -307,4 +307,22 @@ test("diff: create, update, unchanged and stale (never deletes hand-made combos)
   const third = diffCockpitCombos(generated, existing);
   assert.equal(third.update.length, 1);
   assert.equal(third.update[0].id, "id-0");
+});
+
+test("provider-resilient requires observed traffic; idle providers still feed use-case combos", () => {
+  const list = generateCockpitCombos(
+    payload([
+      provider(
+        "idle",
+        [
+          model({ id: "gpt-5", tier: 1, costTier: "premium", toolCalling: true }),
+          model({ id: "gpt-5.4", tier: 1, costTier: "premium", toolCalling: true }),
+        ],
+        { requests: 0 }
+      ),
+    ])
+  );
+  const names = list.map((c) => c.name);
+  assert.ok(!names.includes("cockpit-idle-resilient"));
+  assert.ok(names.includes("cockpit-flagship-coding"));
 });

@@ -167,9 +167,11 @@ export function generateCockpitCombos(payload: CockpitPayload): CockpitCombo[] {
   );
   for (const c of [flagship, economy, free]) if (c) combos.push(c);
 
-  // B) per-provider resilience
+  // B) per-provider resilience — only for providers with observed traffic in the
+  // window, so the suite tracks what is actually in use (catalog-only providers
+  // still feed the use-case combos above).
   for (const provider of payload.providers) {
-    if (!usableProvider(provider)) continue;
+    if (!usableProvider(provider) || provider.requests === 0) continue;
     const own = candidates
       .filter((c) => c.provider.id === provider.id)
       .sort((a, b) => a.model.tier - b.model.tier || byScore(a, b));
