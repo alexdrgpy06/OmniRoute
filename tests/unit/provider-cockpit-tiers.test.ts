@@ -118,3 +118,15 @@ test("rankModels: sorts by tier ascending, then score descending, stable on ties
     ["b", "d", "c", "a"]
   );
 });
+
+test("rankModels: within a tier, models with observed traffic outrank catalog priors", () => {
+  const ranked = rankModels([
+    { id: "prior-high", tier: 2, score: 90, hasTraffic: false },
+    { id: "measured-low", tier: 2, score: 60, hasTraffic: true },
+    { id: "t1-prior", tier: 1, score: 10, hasTraffic: false },
+  ]);
+  assert.deepEqual(
+    ranked.map((m) => m.id),
+    ["t1-prior", "measured-low", "prior-high"]
+  );
+});

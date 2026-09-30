@@ -326,3 +326,27 @@ test("provider-resilient requires observed traffic; idle providers still feed us
   assert.ok(!names.includes("cockpit-idle-resilient"));
   assert.ok(names.includes("cockpit-flagship-coding"));
 });
+
+test("combo targets prefer measured models over higher-scored catalog priors", () => {
+  const list = generateCockpitCombos(
+    payload([
+      provider("p", [
+        model({ id: "gpt-5", tier: 1, costTier: "premium", toolCalling: true, score: 95 }),
+        model({
+          id: "gpt-5.4",
+          tier: 1,
+          costTier: "premium",
+          toolCalling: true,
+          score: 70,
+          hasTraffic: true,
+          requests: 40,
+          successRate: 0.99,
+        }),
+      ]),
+    ])
+  );
+  const flagship = list.find((c) => c.name === "cockpit-flagship-coding");
+  assert.deepEqual(targetsOf(flagship!), ["p/gpt-5.4", "p/gpt-5"]);
+  const resilient = list.find((c) => c.name === "cockpit-p-resilient");
+  assert.equal(targetsOf(resilient!)[0], "p/gpt-5.4");
+});

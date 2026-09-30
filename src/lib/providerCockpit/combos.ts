@@ -125,6 +125,9 @@ function build(
 }
 
 const byScore = (a: Candidate, b: Candidate) => b.model.score - a.model.score;
+// Measured models first (validated by real traffic), then score.
+const byEvidence = (a: Candidate, b: Candidate) =>
+  Number(b.model.hasTraffic) - Number(a.model.hasTraffic) || byScore(a, b);
 const latencyOf = (c: Candidate) =>
   c.model.p50Ms ?? c.model.avgLatencyMs ?? Number.POSITIVE_INFINITY;
 
@@ -144,7 +147,7 @@ export function generateCockpitCombos(payload: CockpitPayload): CockpitCombo[] {
     `${COCKPIT_COMBO_PREFIX}flagship-coding`,
     "priority",
     capPerProvider(
-      candidates.filter((c) => c.model.tier === 1 && c.model.toolCalling).sort(byScore),
+      candidates.filter((c) => c.model.tier === 1 && c.model.toolCalling).sort(byEvidence),
       2,
       6
     )
@@ -163,7 +166,7 @@ export function generateCockpitCombos(payload: CockpitPayload): CockpitCombo[] {
   const free = build(
     `${COCKPIT_COMBO_PREFIX}free-unlimited`,
     "round-robin",
-    capPerProvider(candidates.filter((c) => c.model.costTier === "free").sort(byScore), 3, 10)
+    capPerProvider(candidates.filter((c) => c.model.costTier === "free").sort(byEvidence), 3, 10)
   );
   for (const c of [flagship, economy, free]) if (c) combos.push(c);
 
@@ -174,7 +177,7 @@ export function generateCockpitCombos(payload: CockpitPayload): CockpitCombo[] {
     if (!usableProvider(provider) || provider.requests === 0) continue;
     const own = candidates
       .filter((c) => c.provider.id === provider.id)
-      .sort((a, b) => a.model.tier - b.model.tier || byScore(a, b));
+      .sort((a, b) => a.model.tier - b.model.tier || byEvidence(a, b));
     const enough =
       own.length >= 2 || (own.length === 1 && provider.usableConnectionIds.length >= 2);
     if (!enough) continue;

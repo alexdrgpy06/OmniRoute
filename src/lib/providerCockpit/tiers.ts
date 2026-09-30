@@ -84,11 +84,22 @@ export function cockpitScore(input: CockpitScoreInput): number {
   return Math.round(clamp01(raw) * 1000) / 10;
 }
 
-export function rankModels<T extends { tier: CapabilityTier; score: number }>(models: T[]): T[] {
+/**
+ * Order models by tier, then evidence (models with observed traffic before
+ * catalog-only priors — a measured model is never buried under unmeasured ones
+ * whose neutral latency prior can look better), then score.
+ */
+export function rankModels<T extends { tier: CapabilityTier; score: number; hasTraffic?: boolean }>(
+  models: T[]
+): T[] {
   return models
     .map((model, index) => ({ model, index }))
     .sort(
-      (a, b) => a.model.tier - b.model.tier || b.model.score - a.model.score || a.index - b.index
+      (a, b) =>
+        a.model.tier - b.model.tier ||
+        Number(b.model.hasTraffic === true) - Number(a.model.hasTraffic === true) ||
+        b.model.score - a.model.score ||
+        a.index - b.index
     )
     .map(({ model }) => model);
 }
