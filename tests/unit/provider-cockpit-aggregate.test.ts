@@ -238,3 +238,53 @@ test("estimated cost sums tokens × per-1M prices", () => {
   );
   assert.equal(payload.kpis.estimatedCostUsd, 6);
 });
+
+test("all connections disabled by the operator → provider 'disabled', not 'down'", () => {
+  const payload = assembleCockpit(
+    sources({
+      connections: [conn({ isActive: false }), conn({ id: "x", isActive: false })],
+      catalog: { openai: [{ id: "gpt-5", name: "GPT-5" }] },
+    })
+  );
+  const p = payload.providers[0];
+  assert.equal(p.status, "disabled");
+  assert.equal(p.models[0].eligible, false);
+  assert.equal(payload.kpis.providers.disabled, 1);
+  assert.equal(payload.kpis.providers.down, 0);
+});
+
+test("a mix of disabled and terminal connections is still 'down'", () => {
+  const payload = assembleCockpit(
+    sources({ connections: [conn({ isActive: false }), conn({ id: "x", testStatus: "banned" })] })
+  );
+  assert.equal(payload.providers[0].status, "down");
+});
+
+test("call_logs rows whose provider is a combo name are not treated as providers", () => {
+  const stat = {
+    model: "ranked",
+    requests: 45,
+    successfulRequests: 0,
+    avgLatencyMs: 1,
+    tokensIn: 0,
+    tokensOut: 0,
+    lastCallAt: null,
+    lastErrorAt: null,
+    lastError: "[499] Client disconnected",
+  };
+  const payload = assembleCockpit(
+    sources({
+      comboNames: ["ranked", "combo-tier4-free-fallback"],
+      windowStats: [
+        { ...stat, provider: "ranked" },
+        { ...stat, provider: "combo-tier4-free-fallback", model: "combo-tier4-free-fallback" },
+        { ...stat, provider: "groq", model: "llama", successfulRequests: 45 },
+      ],
+    })
+  );
+  assert.deepEqual(
+    payload.providers.map((p) => p.id),
+    ["groq"]
+  );
+  assert.equal(payload.kpis.requests, 45);
+});

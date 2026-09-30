@@ -12081,6 +12081,7 @@
     "statusDegraded": "Degraded",
     "statusOpen": "Breaker open",
     "statusDown": "Down",
+    "statusDisabled": "Disabled",
     "filterFree": "Free only",
     "filterTraffic": "With traffic",
     "filterRange": "Time range",

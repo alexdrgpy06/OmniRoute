@@ -75,6 +75,7 @@ export default function CockpitFilters({
         <option value="degraded">{t("statusDegraded")}</option>
         <option value="open">{t("statusOpen")}</option>
         <option value="down">{t("statusDown")}</option>
+        <option value="disabled">{t("statusDisabled")}</option>
       </select>
       <label className="flex items-center gap-1.5 text-xs text-text-muted cursor-pointer select-none">
         <input

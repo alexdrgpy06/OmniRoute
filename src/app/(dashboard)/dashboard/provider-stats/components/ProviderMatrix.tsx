@@ -19,6 +19,7 @@ const STATUS_LABEL_KEY = {
   degraded: "statusDegraded",
   open: "statusOpen",
   down: "statusDown",
+  disabled: "statusDisabled",
 } as const;
 
 const TIER_LABEL_KEY = { 1: "tier1", 2: "tier2", 3: "tier3" } as const;

@@ -47,7 +47,7 @@ interface Candidate {
 }
 
 function usableProvider(p: CockpitProvider): boolean {
-  return p.status !== "open" && p.status !== "down";
+  return p.status !== "open" && p.status !== "down" && p.status !== "disabled";
 }
 
 function eligibleCandidates(payload: CockpitPayload): Candidate[] {

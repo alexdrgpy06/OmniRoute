@@ -22,7 +22,7 @@ export const COCKPIT_RANGE_MS: Record<CockpitRange, number> = {
   "7d": 604_800_000,
 };
 
-export type ProviderStatus = "ok" | "degraded" | "open" | "down";
+export type ProviderStatus = "ok" | "degraded" | "open" | "down" | "disabled";
 
 export interface CockpitBreaker {
   name: string;
@@ -73,6 +73,11 @@ export interface CockpitSources {
   classifyCost: (provider: string, model: string) => CockpitCost;
   contextWindow: (model: string) => number | null;
   displayName: (provider: string) => string;
+  /**
+   * Combo names. When a combo fails before reaching a target (e.g. the client aborts),
+   * call_logs records the combo name as `provider`; those rows are not providers.
+   */
+  comboNames?: readonly string[];
 }
 
 export interface CockpitModel {
@@ -134,7 +139,14 @@ export interface CockpitPayload {
     tokensIn: number;
     tokensOut: number;
     estimatedCostUsd: number;
-    providers: { total: number; ok: number; degraded: number; open: number; down: number };
+    providers: {
+      total: number;
+      ok: number;
+      degraded: number;
+      open: number;
+      down: number;
+      disabled: number;
+    };
   };
   providers: CockpitProvider[];
 }
@@ -172,8 +184,11 @@ interface ModelAccumulator {
 
 export function assembleCockpit(src: CockpitSources): CockpitPayload {
   const providerIds = new Set<string>();
+  const comboNames = new Set(src.comboNames ?? []);
   for (const c of src.connections) providerIds.add(c.provider);
-  for (const s of src.windowStats) providerIds.add(s.provider);
+  for (const s of src.windowStats) {
+    if (!comboNames.has(s.provider)) providerIds.add(s.provider);
+  }
 
   const breakerByName = new Map(src.breakers.map((b) => [b.name, b]));
   let estimatedCostUsd = 0;
@@ -224,7 +239,8 @@ export function assembleCockpit(src: CockpitSources): CockpitPayload {
     const providerSuccess = ratio(providerOk, providerRequests);
 
     let status: ProviderStatus = "ok";
-    if (breakerState === "OPEN") status = "open";
+    if (counts.total > 0 && counts.disabled === counts.total) status = "disabled";
+    else if (breakerState === "OPEN") status = "open";
     else if (counts.total > 0 && counts.active === 0 && counts.cooldown === 0) status = "down";
     else if (
       breakerState === "DEGRADED" ||
@@ -236,7 +252,7 @@ export function assembleCockpit(src: CockpitSources): CockpitPayload {
     ) {
       status = "degraded";
     }
-    const providerUsable = status !== "open" && status !== "down";
+    const providerUsable = status !== "open" && status !== "down" && status !== "disabled";
     // Providers with no stored connections (noAuth/free gateways) are usable as a whole.
     const lockableConnectionIds = counts.total > 0 ? new Set(usableConnectionIds) : null;
 
@@ -348,7 +364,7 @@ export function assembleCockpit(src: CockpitSources): CockpitPayload {
   }
 
   providers.sort((a, b) => b.requests - a.requests || a.name.localeCompare(b.name));
-  const byStatus = { ok: 0, degraded: 0, open: 0, down: 0 };
+  const byStatus = { ok: 0, degraded: 0, open: 0, down: 0, disabled: 0 };
   for (const p of providers) byStatus[p.status]++;
 
   return {
@@ -409,6 +425,11 @@ export async function loadCockpit(range: CockpitRange = "24h"): Promise<CockpitP
     if (entry?.models?.length) catalog[providerId] = entry.models;
   }
 
+  const comboNames = await safe(async () => {
+    const { getCombos } = await import("@/lib/db/combos");
+    return (await getCombos()).map((c) => String((c as { name?: unknown }).name ?? ""));
+  }, [] as string[]);
+
   const aiProviders = providersConst.AI_PROVIDERS as Record<string, { name?: string } | undefined>;
 
   return assembleCockpit({
@@ -430,5 +451,6 @@ export async function loadCockpit(range: CockpitRange = "24h"): Promise<CockpitP
     },
     contextWindow: (model) => modelSpecs.getAuthoritativeContextWindow(model),
     displayName: (provider) => aiProviders[provider]?.name || provider,
+    comboNames,
   });
 }
