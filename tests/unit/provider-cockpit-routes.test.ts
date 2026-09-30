@@ -120,3 +120,23 @@ test("invalid bodies return 400 without leaking stack traces", async () => {
   const res = await applyRoute.POST(post("/api/provider-stats/combos/apply", { names: "x" }));
   assert.equal(res.status, 400);
 });
+
+test("inner /api/combos calls carry the outer request's authz stamp and session", async () => {
+  const { buildInnerRequestHeaders } = await import("../../src/lib/providerCockpit/applyCombos.ts");
+  const outer = new Request("http://localhost/api/provider-stats/combos/apply", {
+    method: "POST",
+    headers: {
+      "content-type": "text/plain",
+      "content-length": "12",
+      cookie: "auth_token=abc",
+      "x-omniroute-auth-kind": "management_key",
+      "x-omniroute-auth-label": "local-cli-token",
+    },
+  });
+  const inner = buildInnerRequestHeaders(outer);
+  assert.equal(inner.get("x-omniroute-auth-kind"), "management_key");
+  assert.equal(inner.get("x-omniroute-auth-label"), "local-cli-token");
+  assert.equal(inner.get("cookie"), "auth_token=abc");
+  assert.equal(inner.get("content-type"), "application/json");
+  assert.equal(inner.get("content-length"), null);
+});

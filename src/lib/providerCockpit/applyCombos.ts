@@ -47,12 +47,16 @@ export interface CockpitApplyResult {
   error?: string;
 }
 
-function forwardHeaders(request: Request): Headers {
-  const headers = new Headers({ "content-type": "application/json" });
-  for (const key of ["cookie", "authorization", "x-api-key"]) {
-    const value = request.headers.get(key);
-    if (value) headers.set(key, value);
-  }
+/**
+ * Headers for the in-process `/api/combos` calls. The outer request already
+ * passed the authz pipeline (which replaces raw machine tokens with trusted
+ * `x-omniroute-auth-*` stamps), so every header is carried over — dropping the
+ * stamps would make the inner handlers see an unauthenticated caller.
+ */
+export function buildInnerRequestHeaders(request: Request): Headers {
+  const headers = new Headers(request.headers);
+  headers.delete("content-length");
+  headers.set("content-type", "application/json");
   return headers;
 }
 
@@ -93,7 +97,7 @@ export async function applyCockpitCombos(
       const res = await createCombo(
         new Request(`${origin}/api/combos`, {
           method: "POST",
-          headers: forwardHeaders(request),
+          headers: buildInnerRequestHeaders(request),
           body: JSON.stringify(combo),
         })
       );
@@ -109,7 +113,7 @@ export async function applyCockpitCombos(
       const res = await updateCombo(
         new Request(`${origin}/api/combos/${encodeURIComponent(id)}`, {
           method: "PUT",
-          headers: forwardHeaders(request),
+          headers: buildInnerRequestHeaders(request),
           body: JSON.stringify(combo),
         }),
         { params: Promise.resolve({ id }) }
