@@ -22,6 +22,7 @@ function insertCallLog(row: Record<string, unknown>) {
     tokens_in: 10,
     tokens_out: 20,
     error_summary: null,
+    path: "/v1/chat/completions",
     ...row,
     id: row.id ?? `log-${Math.random().toString(16).slice(2)}`,
     timestamp: row.timestamp ?? new Date().toISOString(),
@@ -31,7 +32,7 @@ function insertCallLog(row: Record<string, unknown>) {
     .prepare(
       `INSERT INTO call_logs (id, timestamp, method, path, status, model, provider, duration,
          tokens_in, tokens_out, error_summary)
-       VALUES (@id, @timestamp, 'POST', '/v1/chat/completions', @status, @model, @provider,
+       VALUES (@id, @timestamp, 'POST', @path, @status, @model, @provider,
          @duration, @tokens_in, @tokens_out, @error_summary)`
     )
     .run(full);
@@ -102,4 +103,31 @@ test("getGlobalLatencyPercentiles returns nulls for an empty window and values o
   const g = stats.getGlobalLatencyPercentiles(iso(HOUR));
   assert.equal(typeof g.p50Ms, "number");
   assert.ok((g.p95Ms ?? 0) >= (g.p50Ms ?? 0));
+});
+
+test("internal dashboard probes (/api/providers/*) are excluded from cockpit stats", () => {
+  insertCallLog({ provider: "probe", model: "connection-test", path: "/api/providers/test" });
+  insertCallLog({
+    provider: "probe",
+    model: "model-sync",
+    path: "/api/providers/abc/models",
+    duration: 99_999,
+  });
+  insertCallLog({
+    provider: "probe",
+    model: "real-model",
+    path: "/chat/completions",
+    duration: 10,
+  });
+
+  const rows = stats.getModelWindowStats(iso(HOUR)).filter((r) => r.provider === "probe");
+  assert.deepEqual(
+    rows.map((r) => r.model),
+    ["real-model"]
+  );
+  const lat = stats.getModelLatencyPercentiles(iso(HOUR)).filter((r) => r.provider === "probe");
+  assert.deepEqual(
+    lat.map((r) => r.model),
+    ["real-model"]
+  );
 });

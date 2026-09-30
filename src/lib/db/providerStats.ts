@@ -67,7 +67,11 @@ export function getModelCallStats(): ModelCallStat[] {
     .all() as ModelCallStat[];
 }
 
-/** Per-(provider, model) aggregates restricted to `timestamp >= sinceIso` (Provider Cockpit). */
+/**
+ * Per-(provider, model) aggregates restricted to `timestamp >= sinceIso` (Provider Cockpit).
+ * Dashboard probes logged under `/api/providers/*` (connection tests, model sync) are
+ * excluded so they do not surface as pseudo-models or skew success/latency.
+ */
 export interface ModelWindowStat {
   provider: string;
   model: string;
@@ -97,6 +101,7 @@ export function getModelWindowStats(sinceIso: string): ModelWindowStat[] {
          FROM call_logs
          WHERE timestamp >= @since
            AND provider IS NOT NULL AND provider != '-' AND model IS NOT NULL
+           AND (path IS NULL OR path NOT LIKE '/api/providers/%')
        ),
        last_errors AS (
          SELECT provider, model, timestamp AS lastErrorAt, error_summary AS lastError,
@@ -135,6 +140,7 @@ export function getModelLatencyPercentiles(sinceIso: string): ModelLatencyPercen
          FROM call_logs
          WHERE timestamp >= @since
            AND provider IS NOT NULL AND provider != '-' AND model IS NOT NULL
+           AND (path IS NULL OR path NOT LIKE '/api/providers/%')
            AND status >= 200 AND status < 400
        )
        SELECT
@@ -163,6 +169,7 @@ export function getGlobalLatencyPercentiles(sinceIso: string): {
          FROM call_logs
          WHERE timestamp >= @since
            AND provider IS NOT NULL AND provider != '-'
+           AND (path IS NULL OR path NOT LIKE '/api/providers/%')
            AND status >= 200 AND status < 400
        )
        SELECT

@@ -21,6 +21,7 @@ test("capabilityTier: flagship name patterns land in T1", () => {
   assert.equal(capabilityTier(meta({ model: "claude-opus-4-6", costTier: "premium" })), 1);
   assert.equal(capabilityTier(meta({ model: "gemini-2.5-pro", costTier: "premium" })), 1);
   assert.equal(capabilityTier(meta({ model: "gpt-5", costTier: "premium" })), 1);
+  assert.equal(capabilityTier(meta({ model: "claude-fable-5", costTier: "premium" })), 1);
 });
 
 test("capabilityTier: light name patterns land in T3", () => {

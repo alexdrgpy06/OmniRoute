@@ -36,7 +36,7 @@ const LIGHT_PATTERN = /(^|[-_.:/])(lite|nano|tiny|haiku|small|micro)([-_.:/]|$)/
 const BALANCED_PATTERN = /(^|[-_.:/])(mini|flash|turbo|air|medium|instant)([-_.:/]|$)/i;
 // Flagship markers.
 const FLAGSHIP_PATTERN =
-  /(^|[-_.:/])(opus|sonnet|pro|ultra|max|large|r1|k2|reasoner|thinking)([-_.:/]|$)|gpt-5(?![-.]?(mini|nano))|(^|[-_/])o[134](?![-.]?mini)([-_.:/]|$)|grok-4|deepseek-v3/i;
+  /(^|[-_.:/])(opus|fable|sonnet|pro|ultra|max|large|r1|k2|reasoner|thinking)([-_.:/]|$)|gpt-5(?![-.]?(mini|nano))|(^|[-_/])o[134](?![-.]?mini)([-_.:/]|$)|grok-4|deepseek-v3/i;
 // Parameter-size marker such as "-8b", ":70b", "-480b" (not "a3b" MoE active size).
 const PARAM_SIZE_PATTERN = /(?:^|[-_.:/])(\d+(?:\.\d+)?)b(?:[-_.:/]|$)/i;
 
