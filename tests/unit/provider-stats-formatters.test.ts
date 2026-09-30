@@ -29,7 +29,7 @@ test("formatComboSuccessRate preserves the producer's 0-100 percentage scale", (
 
 test("Provider Stats renders combo metrics through the percentage-scale formatter", () => {
   const source = fs.readFileSync(
-    path.resolve("src/app/(dashboard)/dashboard/provider-stats/page.tsx"),
+    path.resolve("src/app/(dashboard)/dashboard/provider-stats/components/HistoryView.tsx"),
     "utf8"
   );
 
