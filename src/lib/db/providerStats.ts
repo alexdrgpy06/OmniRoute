@@ -66,3 +66,84 @@ export function getModelCallStats(): ModelCallStat[] {
     )
     .all() as ModelCallStat[];
 }
+
+/** Per-(provider, model) aggregates restricted to `timestamp >= sinceIso` (Provider Cockpit). */
+export interface ModelWindowStat {
+  provider: string;
+  model: string;
+  requests: number;
+  successfulRequests: number;
+  avgLatencyMs: number | null;
+  tokensIn: number;
+  tokensOut: number;
+  lastCallAt: string | null;
+  lastErrorAt: string | null;
+  lastError: string | null;
+}
+
+export interface ModelLatencyPercentile {
+  provider: string;
+  model: string;
+  p50Ms: number | null;
+  p95Ms: number | null;
+}
+
+export function getModelWindowStats(sinceIso: string): ModelWindowStat[] {
+  const db = getDbInstance();
+  return db
+    .prepare(
+      `WITH windowed AS (
+         SELECT provider, model, status, duration, tokens_in, tokens_out, timestamp, error_summary
+         FROM call_logs
+         WHERE timestamp >= @since
+           AND provider IS NOT NULL AND provider != '-' AND model IS NOT NULL
+       ),
+       last_errors AS (
+         SELECT provider, model, timestamp AS lastErrorAt, error_summary AS lastError,
+                ROW_NUMBER() OVER (PARTITION BY provider, model ORDER BY timestamp DESC) AS rn
+         FROM windowed
+         WHERE status IS NULL OR status < 200 OR status >= 400
+       )
+       SELECT
+         w.provider,
+         w.model,
+         COUNT(*) AS requests,
+         SUM(CASE WHEN w.status >= 200 AND w.status < 400 THEN 1 ELSE 0 END) AS successfulRequests,
+         ROUND(AVG(w.duration)) AS avgLatencyMs,
+         COALESCE(SUM(w.tokens_in), 0) AS tokensIn,
+         COALESCE(SUM(w.tokens_out), 0) AS tokensOut,
+         MAX(w.timestamp) AS lastCallAt,
+         le.lastErrorAt,
+         le.lastError
+       FROM windowed w
+       LEFT JOIN last_errors le
+         ON le.provider = w.provider AND le.model = w.model AND le.rn = 1
+       GROUP BY w.provider, w.model
+       ORDER BY w.provider, requests DESC`
+    )
+    .all({ since: sinceIso }) as ModelWindowStat[];
+}
+
+export function getModelLatencyPercentiles(sinceIso: string): ModelLatencyPercentile[] {
+  const db = getDbInstance();
+  return db
+    .prepare(
+      `WITH ok AS (
+         SELECT provider, model, duration,
+                ROW_NUMBER() OVER (PARTITION BY provider, model ORDER BY duration) AS rn,
+                COUNT(*) OVER (PARTITION BY provider, model) AS cnt
+         FROM call_logs
+         WHERE timestamp >= @since
+           AND provider IS NOT NULL AND provider != '-' AND model IS NOT NULL
+           AND status >= 200 AND status < 400
+       )
+       SELECT
+         provider,
+         model,
+         MAX(CASE WHEN rn = (cnt * 50 + 99) / 100 THEN duration END) AS p50Ms,
+         MAX(CASE WHEN rn = (cnt * 95 + 99) / 100 THEN duration END) AS p95Ms
+       FROM ok
+       GROUP BY provider, model`
+    )
+    .all({ since: sinceIso }) as ModelLatencyPercentile[];
+}
